@@ -28,7 +28,7 @@ if uploaded_file is not None:
         with st.spinner("구글 AI가 분석 중입니다..."):
             try:
                 # 텍스트와 이미지 분석에 최적화된 무료 지원 모델
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-1.5-flash-latest')
                 prompt = "제공된 수행평가 사진을 분석해서 제목, 일정, 핵심 평가 조건, 준비사항을 한국어로 깔끔하게 정리해줘."
                 
                 response = model.generate_content([prompt, image])
