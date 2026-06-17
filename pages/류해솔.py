@@ -9,7 +9,7 @@ def app():
     if 'tasks' not in st.session_state:
         st.session_state.tasks = [
             {"과목/평가명": "기술가정 수행평가", "마감일": date(2026, 7, 5)},
-            {"과목/평가mm": "수학 문제풀이", "마감일": date(2026, 6, 25)}
+            {"과목/평가명": "수학 문제풀이", "마감일": date(2026, 6, 25)}
         ]
 
     # --- 1. 새로운 수행평가 등록 양식 ---
@@ -39,7 +39,7 @@ def app():
         for task in st.session_state.tasks:
             d_day = (task["마감일"] - today).days
             processed_tasks.append({
-                "과목/평가명": task["과목/평가명"],
+                "과목/평가명": task["과목/평가명"],  # <- 오타 수정 완료!
                 "마감일": task["마감일"],
                 "d_day": d_day
             })
@@ -63,9 +63,9 @@ def app():
                 # 3일 이내로 남았으면 경고 표시
                 color_box = "🚨" if d_day_val <= 3 else "🟢"
 
-            # 메트릭(Metric) 혹은 텍스트 박스로 시각화
+            # 텍스트 박스로 시각화
             st.info(f"{color_box} **[{d_day_str}]** {task['과목/평가명']} (마감일: {task['마감일'].strftime('%Y-%m-%d')})")
 
-# 독립 실행 테스트를 위한 코드 (메인 앱에 연결할 때는 이 부분 제외 가능)
+# 독립 실행 테스트를 위한 코드
 if __name__ == "__main__":
     app()
