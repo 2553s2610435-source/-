@@ -1,123 +1,116 @@
 import streamlit as st
 from PIL import Image
-import pytesseract
-import re
+import openai
+import os
 
+# 1. 페이지 기본 설정
 st.set_page_config(
-    page_title="수행평가 안내 분석기",
-    page_icon="📚",
-    layout="wide"
+    page_title="수행평가 가이드 & 분석기",
+    page_icon="📝",
+    layout="centered"
 )
 
-st.title("📚 수행평가 안내 분석기")
+# 2. OpenAI API 키 설정
+# Streamlit Cloud 배포 시 Advanced Settings -> Secrets에 OPENAI_API_KEY를 등록해야 합니다.
+if "OPENAI_API_KEY" in st.secrets:
+    openai.api_key = st.secrets["OPENAI_API_KEY"]
+elif os.getenv("OPENAI_API_KEY"):
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+else:
+    st.sidebar.warning("⚠️ OpenAI API 키가 설정되지 않았습니다. 사이드바에 입력하거나 Streamlit Secrets를 설정해주세요.")
+    user_api_key = st.sidebar.text_input("OpenAI API Key 입력:", type="password")
+    if user_api_key:
+        openai.api_key = user_api_key
 
-st.write(
-    """
-    수행평가 안내문 사진을 업로드하면
-    내용을 분석하여 요약 및 체크리스트를 생성합니다.
-    """
-)
+# 3. 앱 타이틀 및 소개
+st.title("📝 수행평가 안내 & 사진 분석기")
+st.markdown("""
+이 앱은 학교 수행평가 안내문을 확인하고, **수행평가 지침이나 조건이 담긴 사진을 업로드하면 AI가 핵심 내용을 분석**해주는 서비스입니다.
+""")
 
-uploaded_file = st.file_uploader(
-    "수행평가 안내 사진 업로드",
-    type=["png", "jpg", "jpeg"]
-)
+---
 
-def extract_info(text):
-    result = {
-        "과목": "확인 불가",
-        "제출일": "확인 불가",
-        "제목": "확인 불가"
-    }
+# 4. 탭 구성 (안내문 vs 사진 분석)
+tab1, tab2 = st.tabs(["📢 수행평가 기본 안내", "🔍 안내문 사진 분석하기"])
 
-    date_pattern = r"\d{4}[./-]\d{1,2}[./-]\d{1,2}|\d{1,2}[./-]\d{1,2}"
+with tab1:
+    st.header("📌 이번 학기 수행평가 핵심 요약")
+    
+    # 학교 상황에 맞게 텍스트를 수정하여 사용하세요.
+    st.markdown("""
+    ### 1. 국어과 - 독서 논술 평가
+    * **일정:** 14주차 (자세한 날짜는 추후 공지)
+    * **배점:** 20%
+    * **준비물:** 지정 도서 (*자기만의 방*), 필기구
+    
+    ### 2. 수학과 - 문제 풀이 및 개념 설명
+    * **일정:** 10주차 수업 시간 중
+    * **배점:** 15%
+    * **평가 요소:** 조건에 맞는 풀이 과정 기술 및 오류 수정 능력
+    """)
+    
+    st.info("💡 세부 일정 및 평가 기준은 학교 사정에 따라 변경될 수 있으니 반드시 교과 선생님 공지를 우선으로 확인하세요.")
 
-    date_match = re.search(date_pattern, text)
-    if date_match:
-        result["제출일"] = date_match.group()
-
-    lines = [line.strip() for line in text.split("\n") if line.strip()]
-
-    if len(lines) > 0:
-        result["제목"] = lines[0]
-
-    subjects = [
-        "국어", "영어", "수학", "과학",
-        "사회", "역사", "정보", "기술가정",
-        "음악", "미술"
-    ]
-
-    for subject in subjects:
-        if subject in text:
-            result["과목"] = subject
-            break
-
-    return result
-
-if uploaded_file:
-    image = Image.open(uploaded_file)
-
-    st.image(
-        image,
-        caption="업로드한 수행평가 안내",
-        use_container_width=True
-    )
-
-    with st.spinner("분석 중..."):
-        try:
-            text = pytesseract.image_to_string(image, lang="kor+eng")
-
-            st.subheader("📄 추출된 텍스트")
-
-            if text.strip():
-                st.text_area(
-                    "OCR 결과",
-                    text,
-                    height=250
-                )
-
-                info = extract_info(text)
-
-                st.subheader("🔍 분석 결과")
-
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-                    st.metric("과목", info["과목"])
-
-                with col2:
-                    st.metric("제출일", info["제출일"])
-
-                with col3:
-                    st.metric("제목", info["제목"])
-
-                st.subheader("📝 요약")
-
-                summary = text[:500]
-
-                st.info(summary)
-
-                st.subheader("✅ 해야 할 일")
-
-                checklist = []
-
-                if info["제출일"] != "확인 불가":
-                    checklist.append(
-                        f"제출일({info['제출일']}) 확인하기"
-                    )
-
-                checklist.extend([
-                    "수행평가 주제 확인",
-                    "준비물 확인",
-                    "평가 기준 확인",
-                    "제출 방식 확인"
-                ])
-
-                for item in checklist:
-                    st.checkbox(item)
-
+with tab2:
+    st.header("📸 수행평가 사진 분석")
+    st.write("선생님이 나눠주신 수행평가 평가지나 칠판의 안내문 사진을 업로드해보세요. AI가 핵심 조건과 일정을 정리해 드립니다.")
+    
+    # 이미지 업로드 컴포넌트
+    uploaded_file = st.file_uploader("수행평가 안내 이미지 업로드 (jpg, jpeg, png)", type=["jpg", "jpeg", "png"])
+    
+    if uploaded_file is not None:
+        # 이미지 화면에 표시
+        image = Image.open(uploaded_file)
+        st.image(image, caption='업로드된 수행평가 안내문', use_column_width=True)
+        
+        # 분석 버튼
+        if st.button("🚀 사진 분석 시작"):
+            if not openai.api_key:
+                st.error("OpenAI API 키가 필요합니다. 사이드바를 확인해주세요.")
             else:
-                st.warning("텍스트를 인식하지 못했습니다.")
-
-        except Exception as e:
-            st.error(f"오류 발생: {e}")
+                with st.spinner("AI가 수행평가 안내문을 분석하고 있습니다... 잠시만 기다려주세요."):
+                    try:
+                        # Streamlit 업로드 파일을 bytes로 변환
+                        import base64
+                        uploaded_file.seek(0)
+                        encoded_image = base64.b64encode(uploaded_file.read()).decode('utf-8')
+                        
+                        # OpenAI Vision API 호출 (gpt-4o-mini 모델 활용)
+                        client = openai.OpenAI(api_key=openai.api_key)
+                        response = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "text", 
+                                            "text": (
+                                                "너는 학생들의 수행평가 준비를 돕는 친절한 AI 매니저야. "
+                                                "제공된 수행평가 안내문 사진을 분석해서 아래 템플릿에 맞춰 한국어로 깔끔하게 정리해줘.\n\n"
+                                                "1. **수행평가 제목 및 과목**:\n"
+                                                "2. **중요 일정 및 마감 기한**:\n"
+                                                "3. **핵심 평가 조건/감점 요인 (리스트 형태로)**:\n"
+                                                "4. **학생들이 놓치기 쉬운 꿀팁/준비사항**:"
+                                            )
+                                        },
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": f"data:image/jpeg;base64,{encoded_image}"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            max_tokens=1000
+                        )
+                        
+                        # 결과 출력
+                        analysis_result = response.choices[0].message.content
+                        st.success("✨ 분석이 완료되었습니다!")
+                        st.markdown("---")
+                        st.markdown(analysis_result)
+                        
+                    except Exception as e:
+                        st.error(f"분석 중 오류가 발생했습니다: {e}")
