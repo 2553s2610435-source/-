@@ -1,88 +1,96 @@
 import streamlit as st
 import google.generativeai as genai
+from PIL import Image
 import io
 
-# 1. 페이지 및 스타일 설정
+# 1. 페이지 설정 및 디자인
 st.set_page_config(page_title="EduScan | 수행평가 비서", page_icon="📅", layout="wide")
+
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; border-radius: 10px; height: 3em; background-color: #4A90E2; color: white; }
-    .status-box { padding: 20px; border-radius: 10px; background-color: #ffffff; border: 1px solid #e0e0e0; }
+    .stButton>button { width: 100%; border-radius: 10px; background-color: #4A90E2; color: white; font-weight: bold; }
+    .result-card { padding: 20px; border-radius: 15px; background-color: white; border: 1px solid #e0e0e0; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. 세션 상태 초기화 (페이지 간 데이터 유지)
-if "eval_data" not in st.session_state:
-    st.session_state.eval_data = None
-if "uploaded_img_bytes" not in st.session_state:
-    st.session_state.uploaded_img_bytes = None
+# 2. 세션 상태 초기화 (페이지 이동 시 데이터 유지)
+if "eval_result" not in st.session_state:
+    st.session_state.eval_result = None
+if "img_data" not in st.session_state:
+    st.session_state.img_data = None
 
-# 3. API 설정 (Secrets 안전하게 가져오기)
+# 3. API 키 설정 (Secrets 보안 연결)
 try:
+    # Streamlit Cloud의 Secrets에서 GEMINI_API_KEY를 가져옵니다.
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("🔑 Streamlit Cloud 설정에서 GEMINI_API_KEY를 입력해주세요!")
+    st.error("⚠️ Secrets 설정에서 'GEMINI_API_KEY'를 등록해주세요.")
     st.stop()
 
-# 4. 사이드바 메뉴 전환
+# 4. 사이드바 메뉴 (간단하고 안전한 페이지 전환)
 st.sidebar.title("🚀 EduScan")
-menu = st.sidebar.selectbox("메뉴 선택", ["📸 사진 업로드 및 분석", "📊 정리된 대시보드"])
+page = st.sidebar.radio("메뉴", ["📸 사진 분석하기", "📊 정리된 내용 보기"])
 
-# --- 페이지 1: 업로드 및 분석 ---
-if menu == "📸 사진 업로드 및 분석":
-    st.title("📸 수행평가 안내문 스캔")
-    st.write("안내문 사진을 올리면 AI가 일정을 정리해 드립니다.")
-    
+# --- [페이지 1] 사진 분석하기 ---
+if page == "📸 사진 분석하기":
+    st.title("📸 수행평가 안내문 분석")
+    st.write("안내문 사진을 올리면 AI가 핵심 내용을 표와 리스트로 정리합니다.")
+
     col1, col2 = st.columns([1, 1])
-    
+
     with col1:
-        uploaded_file = st.file_uploader("수행평가 사진 업로드", type=["jpg", "jpeg", "png"])
+        st.subheader("1. 사진 업로드")
+        uploaded_file = st.file_uploader("수행평가 이미지 선택", type=["jpg", "jpeg", "png"])
         if uploaded_file:
-            # 바이트 데이터로 읽어서 세션에 보관
-            st.session_state.uploaded_img_bytes = uploaded_file.read()
-            st.image(st.session_state.uploaded_img_bytes, caption="업로드된 안내문", use_container_width=True)
+            st.session_state.img_data = uploaded_file.read()
+            st.image(st.session_state.img_data, caption="업로드 완료", use_container_width=True)
 
     with col2:
-        if st.session_state.uploaded_img_bytes:
-            if st.button("🪄 AI 분석 시작"):
-                with st.spinner("이미지를 분석하고 있습니다..."):
+        st.subheader("2. AI 스캔")
+        if st.session_state.img_data:
+            if st.button("🪄 분석 시작 (Gemini 2.5 Flash)"):
+                with st.spinner("이미지를 읽고 정리 중..."):
                     try:
-                        # 이미지를 Gemini가 인식할 수 있는 형태로 변환
-                        from PIL import Image
-                        image = Image.open(io.BytesIO(st.session_state.uploaded_img_bytes))
-                        
-                        # gemini-2.5-flash-lite 모델 호출
+                        # 이미지 처리
+                        img = Image.open(io.BytesIO(st.session_state.img_data))
                         model = genai.GenerativeModel('gemini-2.5-flash-lite')
                         
-                        prompt = "이 수행평가 안내문을 분석해서 '1.과목명/평가명, 2.마감 기한, 3.주요 평가 내용, 4.감점 주의사항, 5.배점 비중' 항목으로 나누어 아주 깔끔하게 정리해줘."
-                        response = model.generate_content([prompt, image])
+                        # 프롬프트 설정
+                        prompt = "이 사진에서 수행평가 정보를 추출해서 1.과목/평가명, 2.제출 기한, 3.주요 과제 내용, 4.주의사항(감점요인), 5.점수 비중을 나누어 아주 깔끔한 마크다운 형식으로 정리해줘."
                         
-                        # 결과를 세션에 저장
-                        st.session_state.eval_data = response.text
-                        st.success("✅ 분석 완료! '정리된 대시보드' 페이지에서 확인하세요.")
-                        st.markdown(st.session_state.eval_data)
+                        response = model.generate_content([prompt, img])
+                        st.session_state.eval_result = response.text
+                        st.success("✅ 분석 완료! '정리된 내용 보기' 메뉴로 이동해 보세요.")
+                        st.markdown(st.session_state.eval_result)
                     except Exception as e:
                         st.error(f"분석 중 오류 발생: {e}")
         else:
-            st.warning("먼저 사진을 업로드해 주세요.")
+            st.info("왼쪽에서 사진을 먼저 업로드해 주세요.")
 
-# --- 페이지 2: 대시보드 ---
-elif menu == "📊 정리된 대시보드":
-    st.title("📊 수행평가 요약 대시보드")
-    
-    if st.session_state.eval_data:
-        col_a, col_b = st.columns([1, 1])
+# --- [페이지 2] 정리된 내용 보기 ---
+elif page == "📊 정리된 내용 보기":
+    st.title("📊 수행평가 요약 리포트")
+
+    if st.session_state.eval_result:
+        st.info("💡 아래 내용은 마우스로 드래그하여 복사할 수 있습니다.")
         
-        with col_a:
-            st.subheader("📝 정리된 내용")
-            st.markdown(f'<div class="status-box">{st.session_state.eval_data}</div>', unsafe_allow_html=True)
-            st.caption("💡 텍스트를 마우스로 드래그하여 복사할 수 있습니다.")
+        # 가독성을 위한 레이아웃
+        res_col, img_col = st.columns([1.2, 0.8])
         
-        with col_b:
-            st.subheader("🖼️ 원본 안내문")
-            if st.session_state.uploaded_img_bytes:
-                st.image(st.session_state.uploaded_img_bytes, use_container_width=True)
+        with res_col:
+            st.markdown("### 📝 정리 결과")
+            # 결과창을 카드 형태로 출력
+            st.markdown(f'<div class="result-card">{st.session_state.eval_result}</div>', unsafe_allow_html=True)
+            
+            if st.button("🔄 다시 분석하러 가기"):
+                st.session_state.eval_result = None
+                st.rerun()
+
+        with img_col:
+            st.markdown("### 🖼️ 원본 확인")
+            if st.session_state.img_data:
+                st.image(st.session_state.img_data, use_container_width=True)
     else:
-        st.info("아직 분석된 데이터가 없습니다. '📸 사진 업로드 및 분석' 페이지에서 먼저 분석을 진행해 주세요.")
+        st.warning("아직 분석된 내용이 없습니다. '📸 사진 분석하기' 메뉴에서 사진을 먼저 올려주세요.")
