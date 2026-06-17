@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image
 import openai
 import os
+import base64
 
 # 1. 페이지 기본 설정
 st.set_page_config(
@@ -11,7 +12,6 @@ st.set_page_config(
 )
 
 # 2. OpenAI API 키 설정
-# Streamlit Cloud 배포 시 Advanced Settings -> Secrets에 OPENAI_API_KEY를 등록해야 합니다.
 if "OPENAI_API_KEY" in st.secrets:
     openai.api_key = st.secrets["OPENAI_API_KEY"]
 elif os.getenv("OPENAI_API_KEY"):
@@ -28,7 +28,8 @@ st.markdown("""
 이 앱은 학교 수행평가 안내문을 확인하고, **수행평가 지침이나 조건이 담긴 사진을 업로드하면 AI가 핵심 내용을 분석**해주는 서비스입니다.
 """)
 
----
+# Streamlit 내에서 화면 구분선을 그을 때는 이렇게 함수를 써야 합니다.
+st.divider()
 
 # 4. 탭 구성 (안내문 vs 사진 분석)
 tab1, tab2 = st.tabs(["📢 수행평가 기본 안내", "🔍 안내문 사진 분석하기"])
@@ -36,7 +37,6 @@ tab1, tab2 = st.tabs(["📢 수행평가 기본 안내", "🔍 안내문 사진 
 with tab1:
     st.header("📌 이번 학기 수행평가 핵심 요약")
     
-    # 학교 상황에 맞게 텍스트를 수정하여 사용하세요.
     st.markdown("""
     ### 1. 국어과 - 독서 논술 평가
     * **일정:** 14주차 (자세한 날짜는 추후 공지)
@@ -55,27 +55,21 @@ with tab2:
     st.header("📸 수행평가 사진 분석")
     st.write("선생님이 나눠주신 수행평가 평가지나 칠판의 안내문 사진을 업로드해보세요. AI가 핵심 조건과 일정을 정리해 드립니다.")
     
-    # 이미지 업로드 컴포넌트
     uploaded_file = st.file_uploader("수행평가 안내 이미지 업로드 (jpg, jpeg, png)", type=["jpg", "jpeg", "png"])
     
     if uploaded_file is not None:
-        # 이미지 화면에 표시
         image = Image.open(uploaded_file)
         st.image(image, caption='업로드된 수행평가 안내문', use_column_width=True)
         
-        # 분석 버튼
         if st.button("🚀 사진 분석 시작"):
             if not openai.api_key:
                 st.error("OpenAI API 키가 필요합니다. 사이드바를 확인해주세요.")
             else:
                 with st.spinner("AI가 수행평가 안내문을 분석하고 있습니다... 잠시만 기다려주세요."):
                     try:
-                        # Streamlit 업로드 파일을 bytes로 변환
-                        import base64
                         uploaded_file.seek(0)
                         encoded_image = base64.b64encode(uploaded_file.read()).decode('utf-8')
                         
-                        # OpenAI Vision API 호출 (gpt-4o-mini 모델 활용)
                         client = openai.OpenAI(api_key=openai.api_key)
                         response = client.chat.completions.create(
                             model="gpt-4o-mini",
@@ -106,10 +100,9 @@ with tab2:
                             max_tokens=1000
                         )
                         
-                        # 결과 출력
                         analysis_result = response.choices[0].message.content
                         st.success("✨ 분석이 완료되었습니다!")
-                        st.markdown("---")
+                        st.divider()
                         st.markdown(analysis_result)
                         
                     except Exception as e:
